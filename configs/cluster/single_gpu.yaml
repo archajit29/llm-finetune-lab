@@ -1,0 +1,13 @@
+# Cluster topology: single GPU, single process (no distributed training).
+#
+# torchrun automatically sets these environment variables for every launched
+# process, so they do NOT need to be specified manually here: RANK, LOCAL_RANK,
+# WORLD_SIZE, LOCAL_WORLD_SIZE, GROUP_RANK, ROLE_RANK, MASTER_ADDR, MASTER_PORT
+# (when using the default c10d rendezvous with a single node).
+# Fields below are the ones YOU must specify to launch torchrun correctly.
+
+# Total number of physical machines (nodes) participating in training.
+num_nodes: 1
+
+# Number of processes (typically = number of GPUs) to launch on this node.
+nproc_per_node: 1

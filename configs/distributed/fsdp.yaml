@@ -1,0 +1,117 @@
+"""FSDP setup.
+
+Wraps a HuggingFace transformer model with PyTorch FSDP (Fully Sharded Data
+Parallel), using settings read from a config dict (see
+configs/distributed/fsdp.yaml for the expected fields).
+"""
+
+import functools
+
+import torch
+from torch.distributed.fsdp import (
+    FullyShardedDataParallel as FSDP,
+    ShardingStrategy,
+    BackwardPrefetch,
+    MixedPrecision,
+    CPUOffload,
+)
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+
+
+_SHARDING_STRATEGIES = {
+    "FULL_SHARD": ShardingStrategy.FULL_SHARD,
+    "SHARD_GRAD_OP": ShardingStrategy.SHARD_GRAD_OP,
+    "NO_SHARD": ShardingStrategy.NO_SHARD,
+    "HYBRID_SHARD": ShardingStrategy.HYBRID_SHARD,
+}
+
+_BACKWARD_PREFETCH = {
+    "BACKWARD_PRE": BackwardPrefetch.BACKWARD_PRE,
+    "BACKWARD_POST": BackwardPrefetch.BACKWARD_POST,
+    None: None,
+}
+
+
+def _resolve_transformer_layer_classes(model):
+    """Resolve the transformer decoder layer class(es) to wrap, dynamically,
+    via the model's `_no_split_modules` attribute (a list of class name
+    strings that HF sets per-architecture, e.g. ["LlamaDecoderLayer"])."""
+    no_split_modules = getattr(model, "_no_split_modules", None)
+    if not no_split_modules:
+        raise ValueError(
+            "Could not determine transformer decoder layer class: "
+            "model._no_split_modules is empty or not set."
+        )
+
+    # Search the model's module tree for classes matching the named layer(s).
+    target_names = set(no_split_modules)
+    found_classes = set()
+    for module in model.modules():
+        if type(module).__name__ in target_names:
+            found_classes.add(type(module))
+
+    if not found_classes:
+        raise ValueError(
+            f"Could not find any modules in the model matching "
+            f"_no_split_modules={no_split_modules}"
+        )
+
+    return found_classes
+
+
+def wrap_model(model, config):
+    """Wrap `model` with PyTorch FSDP according to `config`.
+
+    Args:
+        model: A loaded HuggingFace transformer model (already moved to the
+            correct device/process group context as needed).
+        config: Dict with FSDP settings. Expected keys:
+            - sharding_strategy (str): One of "FULL_SHARD", "SHARD_GRAD_OP",
+              "NO_SHARD", "HYBRID_SHARD".
+            - backward_prefetch (str, optional): "BACKWARD_PRE" or
+              "BACKWARD_POST". Defaults to "BACKWARD_PRE".
+            - cpu_offload (bool, optional): Whether to offload params/grads
+              to CPU. Defaults to False.
+            - mixed_precision (dict, optional): Dict with "param_dtype",
+              "reduce_dtype", "buffer_dtype" keys (e.g. "bf16", "fp16", "fp32").
+              Defaults to no mixed precision.
+            - activation_checkpointing (bool, optional): Whether activation
+              checkpointing is enabled elsewhere in the training setup
+              (informational; this function does not itself apply it).
+
+    Returns:
+        The FSDP-wrapped model.
+    """
+    transformer_layer_classes = _resolve_transformer_layer_classes(model)
+
+    auto_wrap_policy = functools.partial(
+        transformer_auto_wrap_policy,
+        transformer_layer_cls=transformer_layer_classes,
+    )
+
+    sharding_strategy = _SHARDING_STRATEGIES[config["sharding_strategy"]]
+
+    backward_prefetch = _BACKWARD_PREFETCH[config.get("backward_prefetch", "BACKWARD_PRE")]
+
+    cpu_offload = CPUOffload(offload_params=config.get("cpu_offload", False))
+
+    mixed_precision = None
+    mp_config = config.get("mixed_precision")
+    if mp_config:
+        dtype_map = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}
+        mixed_precision = MixedPrecision(
+            param_dtype=dtype_map[mp_config["param_dtype"]],
+            reduce_dtype=dtype_map[mp_config["reduce_dtype"]],
+            buffer_dtype=dtype_map[mp_config["buffer_dtype"]],
+        )
+
+    wrapped_model = FSDP(
+        model,
+        auto_wrap_policy=auto_wrap_policy,
+        sharding_strategy=sharding_strategy,
+        backward_prefetch=backward_prefetch,
+        cpu_offload=cpu_offload,
+        mixed_precision=mixed_precision,
+    )
+
+    return wrapped_model

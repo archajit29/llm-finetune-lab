@@ -1,0 +1,26 @@
+{
+  "_comment": "ZeRO Stage 2 shards optimizer states and gradients (not parameters) across GPUs. Parameters stay fully replicated on every GPU, so it needs more GPU memory than Stage 3 but has lower communication overhead and is generally faster. Best for models that fit in GPU memory in full precision per-GPU but whose optimizer states do not (roughly up to ~13B-30B depending on GPU count/memory). Stage 3 additionally shards parameters themselves, enabling much larger models (30B+) to train on the same hardware, at the cost of higher communication volume (parameters must be all-gathered on demand) and typically slower throughput.",
+
+  "zero_optimization": {
+    "stage": 2,
+    "offload_optimizer": {
+      "device": "cpu",
+      "pin_memory": true
+    },
+    "overlap_comm": true,
+    "contiguous_gradients": true,
+    "allgather_bucket_size": 5e8,
+    "reduce_bucket_size": 5e8
+  },
+
+  "bf16": {
+    "enabled": true
+  },
+
+  "train_micro_batch_size_per_gpu": 4,
+  "gradient_accumulation_steps": 8,
+
+  "gradient_clipping": 1.0,
+  "steps_per_print": 50,
+  "wall_clock_breakdown": false
+}

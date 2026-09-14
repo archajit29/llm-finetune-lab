@@ -1,0 +1,30 @@
+# Cluster topology: multiple nodes, multiple GPUs per node (full distributed
+# training across a cluster).
+#
+# torchrun automatically sets these environment variables for every launched
+# process based on the values below: RANK, LOCAL_RANK, WORLD_SIZE,
+# LOCAL_WORLD_SIZE, GROUP_RANK, ROLE_RANK. However, for MULTI-node jobs you
+# must manually specify how nodes find and connect to each other — that's
+# what master_addr, master_port, and rdzv_backend are for below; torchrun
+# cannot infer these on its own across separate machines.
+
+# Total number of physical machines (nodes) participating in training.
+num_nodes: 4
+
+# Number of processes to launch per node — set this to the number of GPUs
+# available on each node (assumes uniform hardware across nodes).
+nproc_per_node: 8
+
+# Address (hostname or IP) of the rendezvous/master node that all other
+# nodes connect to in order to coordinate startup. Must be reachable from
+# every node in the cluster.
+master_addr: "10.0.0.1"
+
+# Port on the master node used for the rendezvous connection. Must be open/
+# unused and consistent across all node launch commands.
+master_port: 29500
+
+# Rendezvous backend used to coordinate process group formation across nodes.
+# c10d is the modern, recommended default (replaces the older "static"/"etcd"
+# backends for most use cases) and handles elastic/fault-tolerant rendezvous.
+rdzv_backend: "c10d"

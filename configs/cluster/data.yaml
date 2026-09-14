@@ -1,0 +1,36 @@
+# Dataset pipeline configuration for fine-tuning
+
+# HuggingFace Hub dataset ID or local path to the dataset files.
+dataset_name_or_path: "data/train.jsonl"
+
+# File format of the dataset. Supported: "jsonl" (newline-delimited JSON,
+# flexible and easy to inspect/edit) or "parquet" (columnar, faster to load
+# and more memory-efficient for large datasets).
+dataset_format: "jsonl"
+
+# Name of the field/column in each example that contains the raw training text
+# (post any prompt/chat-template formatting already applied upstream).
+text_field: "text"
+
+# Maximum sequence length (in tokens) for tokenized examples; should match
+# the corresponding model config's max_seq_length. Longer sequences are
+# truncated (if packing=false) or split across pack boundaries (if packing=true).
+max_seq_length: 4096
+
+# Whether to use sequence packing: concatenating multiple shorter training
+# examples together (separated by EOS/boundary tokens) to densely fill each
+# max_seq_length-sized training sequence, rather than padding each example
+# individually. This significantly improves throughput by eliminating wasted
+# compute on padding tokens, especially when example lengths vary a lot —
+# GPUs process full max_seq_length sequences either way, so packing ensures
+# that budget is spent on real tokens instead of padding.
+packing: true
+
+# Fraction of the dataset held out for evaluation/validation; the remainder
+# is used for training. E.g. 0.05 = 5% eval, 95% train.
+train_test_split: 0.05
+
+# Number of parallel worker processes used for tokenization/preprocessing
+# (via datasets.map(num_proc=...)). Higher values speed up preprocessing on
+# multi-core machines but increase memory usage; set close to CPU core count.
+num_proc: 16

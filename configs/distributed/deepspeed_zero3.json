@@ -1,0 +1,33 @@
+{
+  "_comment": "ZeRO Stage 3 shards parameters, gradients, AND optimizer states across all GPUs, so no single GPU ever holds the full model. This enables training much larger models (30B+) on hardware that Stage 2 could not fit, at the cost of higher communication volume since full parameter shards must be all-gathered on demand for each layer's forward/backward pass, and typically lower throughput than Stage 2. Use Stage 2 when the model fits per-GPU and you want speed; use Stage 3 when the model itself is too large to fit without sharding parameters.",
+
+  "zero_optimization": {
+    "stage": 3,
+    "offload_optimizer": {
+      "device": "cpu",
+      "pin_memory": true
+    },
+    "offload_param": {
+      "device": "cpu",
+      "pin_memory": true
+    },
+    "overlap_comm": true,
+    "contiguous_gradients": true,
+    "stage3_prefetch_bucket_size": 5e8,
+    "stage3_param_persistence_threshold": 1e6,
+    "stage3_max_live_parameters": 1e9,
+    "stage3_max_reuse_distance": 1e9,
+    "stage3_gather_16bit_weights_on_model_save": true
+  },
+
+  "bf16": {
+    "enabled": true
+  },
+
+  "train_micro_batch_size_per_gpu": 2,
+  "gradient_accumulation_steps": 16,
+
+  "gradient_clipping": 1.0,
+  "steps_per_print": 50,
+  "wall_clock_breakdown": false
+}
